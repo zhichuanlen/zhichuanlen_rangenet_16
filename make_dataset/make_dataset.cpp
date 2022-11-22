@@ -28,10 +28,9 @@ public:
         int argc, 
         char** argv);
 
-    std::string _bin_path;
-    std::string _label_path;
-    std::string _bin_out_path;
-    std::string _label_out_path;
+    std::string _input_path;
+    std::string _output_path;
+    
 
     std::string _mode;
 private:
@@ -43,21 +42,15 @@ private:
 
 CommandLineArgs::CommandLineArgs(int argc, char **argv)
 {
-    _bin_path = "/media/ubuntu/zhi_chuan_len-/lidar_data/test/bin_test/";
-    _label_path = "/media/ubuntu/zhi_chuan_len-/lidar_data/test/label_test/";
-
-    _bin_out_path = "/media/ubuntu/zhi_chuan_len-/lidar_data/test/bin_out_test/";
-    _label_out_path = "/media/ubuntu/zhi_chuan_len-/lidar_data/test/label_out_test/";
+    _input_path = "/media/ubuntu/zhi_chuan_len-/lidar_data/test/bin_out_test/";
+    _output_path = "/media/ubuntu/zhi_chuan_len-/lidar_data/test/label_out_test/";
 
 
     _desc = new boost::program_options::options_description("Program Usage", 1024, 512);
     _desc->add_options()
-                    ("help",     "produce help message")
-                    ("b",   boost::program_options::value<std::string>(&_bin_path)->required(), "bin input file folder")
-                    ("l",   boost::program_options::value<std::string>(&_label_path)->required(), "label input file folder")
-                    ("bo",   boost::program_options::value<std::string>(&_bin_out_path)->required(), "bin file output folder")
-                    ("lo",   boost::program_options::value<std::string>(&_label_out_path)->required(), "label file output folder")
-                    ("m",   boost::program_options::value<std::string>(&_mode)->required(),     "mode -  make_dataset  make_dataset_bin_only ")                    
+                    ("help",     "produce help message")   
+                    ("i",   boost::program_options::value<std::string>(&_input_path)->required(), "bin input file folder")
+                    ("o",   boost::program_options::value<std::string>(&_output_path)->required(), "label input file folder")         
                     ;
     process_command_line(argc, argv);
 }
@@ -237,80 +230,44 @@ int main(int argc, char **argv)
     
     CommandLineArgs cmd_args(argc, argv);
 
-    // 如果输出文件夹不存在就创建一个
+    // 如果输出文件夹不存在就创建一个(只能创建一层目录)
     struct stat sb;
-    std::string folderPath = cmd_args._bin_out_path;
+    std::string folderPath = cmd_args._output_path+"/velodyne/";
     if (! (stat(folderPath.c_str(), &sb) == 0 && S_ISDIR(sb.st_mode)) )
     {//...It is not a directory...
         mkdir(folderPath.c_str(), 0755);
     }
-    folderPath = cmd_args._label_out_path;
+    folderPath = cmd_args._output_path+"/labels/";
     if (! (stat(folderPath.c_str(), &sb) == 0 && S_ISDIR(sb.st_mode)) )
     {//...It is not a directory...
         mkdir(folderPath.c_str(), 0755);
     }
 
+    std::cout<<"make_dataset"<<std::endl;
+    read_filelists( cmd_args._input_path+"/velodyne/", file_lists, "bin" );
+    sort_filelists( file_lists, "bin" );
+    std::cout<<"num of bin file:"<<file_lists.size()<<std::endl;
 
+    read_filelists(cmd_args._input_path+"/labels/", label_lists, "label" );
+    sort_filelists( label_lists, "label" );
+    std::cout<<"num of label file:"<<label_lists.size()<<std::endl;
 
-    if(cmd_args._mode == "make_dataset")
+    std::cout << "Run make_dataset" << std::endl;
+    #pragma omp parallel num_threads(8)
+    #pragma omp parallel for
+    for (int i = 0; i < file_lists.size(); ++i)
     {
-        std::cout<<"make_dataset"<<std::endl;
-        read_filelists( cmd_args._bin_path, file_lists, "bin" );
-        sort_filelists( file_lists, "bin" );
-        std::cout<<"num of bin file:"<<file_lists.size()<<std::endl;
+        std::string bin_file = cmd_args._input_path+"/velodyne/" + file_lists[i];
+        std::string label_file = cmd_args._input_path+"/labels/" + label_lists[i];
 
-        read_filelists( cmd_args._label_path, label_lists, "label" );
-        sort_filelists( label_lists, "label" );
-        std::cout<<"num of label file:"<<label_lists.size()<<std::endl;
+        std::string bin_out_file = cmd_args._output_path+"/velodyne/" + file_lists[i];
+        std::string label_out_file = cmd_args._output_path+"/labels/" + label_lists[i];
 
-        std::cout << "Run make_dataset" << std::endl;
-        #pragma omp parallel num_threads(8)
-        #pragma omp parallel for
-        for (int i = 0; i < file_lists.size(); ++i)
-        {
-            std::string bin_file = cmd_args._bin_path + file_lists[i];
-            std::string label_file = cmd_args._label_path + label_lists[i];
-
-            std::string bin_out_file = cmd_args._bin_out_path + file_lists[i];
-            std::string label_out_file = cmd_args._label_out_path + label_lists[i];
-
-            std::cout << bin_file << "\n"
-                      << bin_out_file << "\n"
-                      << label_file << "\n"
-                      << label_out_file << std::endl;
-            make_dataset( bin_file, label_file , bin_out_file , label_out_file);
-        }
-
+        std::cout << bin_file << "\n"
+                    << bin_out_file << "\n"
+                    << label_file << "\n"
+                    << label_out_file << std::endl;
+        make_dataset( bin_file, label_file , bin_out_file , label_out_file);
     }
-    else if(cmd_args._mode == "make_dataset_bin_only")
-    {
-        std::cout<<"make_dataset_bin_only"<<std::endl;
-        read_filelists( cmd_args._bin_path, file_lists, "bin" );
-        sort_filelists( file_lists, "bin" );
-        std::cout<<"num of bin file:"<<file_lists.size()<<std::endl;
-
-        std::cout << "Run make_dataset" << std::endl;
-        #pragma omp parallel num_threads(8)
-        #pragma omp parallel for
-        for (int i = 0; i < file_lists.size(); ++i)
-        {
-            std::string bin_file = cmd_args._bin_path + file_lists[i];
-
-            std::string bin_out_file = cmd_args._bin_out_path + file_lists[i];
-
-            std::cout << bin_file << "\n"
-                      << bin_out_file << std::endl;
-            make_dataset_bin_only( bin_file,  bin_out_file);
-        }
-
-    }
-    else
-    {
-        std::cout << "No mode provided" << std::endl;
-    }
-    
-
-    
-
     return 0;
 }
