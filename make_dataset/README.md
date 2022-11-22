@@ -1,8 +1,12 @@
 
+# 因为我的研究内容之一（低密度点云的语义提取），需要数据集，所以将semetic_kitti 的 64线点云转换成16线,并且要在ROS框架下验证其他算法，遂整理这个仓库用来存储数据集的制作工具
+
 ###                                                                                                                                make_dataset.cpp
 # 作用
 
 由semantic kitti的64线数据集降采样（四线之中取一线）
+
+
 
 ## Example
 ```
@@ -36,7 +40,5 @@ Options
 
 bash build.sh
 
-
-# kitti_velodyne_bin_to_pcd
-
- - [Visual Odometry / SLAM Evaluation 2012](http://www.cvlibs.net/datasets/kitti/eval_odometry.php)
+ # 语义点云数据播放脚本
+ python pub_semetic_pointcloud2.py '/media/ubuntu/zhi_chuan_len-/lidar_data/get_kitti_bin_16/sequences/01/'

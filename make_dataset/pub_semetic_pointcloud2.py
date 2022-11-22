@@ -4,7 +4,8 @@ import struct
 import time,os,sys
 import numpy as np
 import os
-import matplotlib.pyplot as plt
+import threading
+from threading import Lock, RLock
 from tqdm import tqdm
 from pyquaternion import Quaternion
 from std_msgs.msg import Char,Header
@@ -109,18 +110,6 @@ def get_odom_data(odom_file_path):
         # 最后得到两个numpu矩阵，dataset是存放所有真值的矩阵，groundtruth是存放xy真值的矩阵
         dataset = np.array(dataset)
         groundtruth = np.array(groundtruth)
-
-    x_data = []
-    y_data = []
-#     print(len(dataset))
-    for i in range(len(dataset)):
-        x_data.append(float(dataset[i][0, 3]))
-        y_data.append(float(dataset[i][2, 3]))
-
-#     print(x_data)
-    # 绘制
-    # plt.plot(x_data,y_data)
-    # plt.show()
     return dataset , groundtruth
 
 def get_time_data_list(time_file_path):
@@ -161,6 +150,38 @@ def R_t_2_q(R_t):
     q = Quaternion(matrix=matrix)
     return q
 
+def show_odom_path():
+    import matplotlib.pyplot as plt
+    x_data = []
+    y_data = []
+#     print(len(dataset))
+    for i in range(len(odom_R_t)):
+        x_data.append(float(odom_R_t[i][0, 3]))
+        y_data.append(float(odom_R_t[i][2, 3]))
+    # 绘制
+    lock = Lock()
+    with lock:
+        plt.plot(x_data,y_data)
+        plt.show()
+
+def main_pub():
+    time_begin = time.time()
+    time_cost_sum = 0
+    for i in tqdm(range(len(bin_files))):
+        t_in = time.time()
+        time_list = get_time_data_list(time_file_path)
+        pub_time = time_begin + float(time_list[i])
+        pub_pointcloud(bin_file_path+str(bin_files[i]),label_file_path+str(label_files[i]),pub_time)
+        try:
+            pub_odom(groundtruth[i], R_t_2_q(odom_R_t[i]))
+        except:
+            print("pub odom faild :" ,i)
+            
+        t_out = time.time()
+        used_time = t_out-t_in
+        time_cost_sum += used_time
+    print("共发布"+str(len(bin_files))+"帧消息,平均帧率为"+str(1/(time_cost_sum/len(bin_files))))
+
 
 if __name__ == "__main__":
 
@@ -179,24 +200,6 @@ if __name__ == "__main__":
     label_files = sorted(os.listdir(label_file_path))
 
     odom_R_t, groundtruth = get_odom_data(odom_file_path)
-    time_begin = time.time()
-    time_cost_sum = 0
-    for i in tqdm(range(len(bin_files))):
-        t_in = time.time()
-        time_list = get_time_data_list(time_file_path)
-        pub_time = time_begin + float(time_list[i])
-        pub_pointcloud(bin_file_path+str(bin_files[i]),label_file_path+str(label_files[i]),pub_time)
-        pub_odom(groundtruth[i], R_t_2_q(odom_R_t[i]))
-        # try:
-        #     pub_odom(groundtruth[i], R_t_2_q(odom_R_t[i]))
-        # except:
-        #     print("pub odom faild :" ,i)
-            
-        t_out = time.time()
-        used_time = t_out-t_in
-        time_cost_sum += used_time
-
-    #     fps = 1 / (time.time()-t_in)
-        # print("use time:"+str(used_time))
-    print("共发布"+str(len(bin_files))+"帧消息,平均帧率为"+str(1/(time_cost_sum/len(bin_files))))
-        
+    pub_t = threading.Thread(target = main_pub)
+    pub_t.start()
+    show_odom_path()
