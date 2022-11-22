@@ -1,4 +1,5 @@
 ## 因为我的研究内容之一（低密度点云的语义提取），需要数据集，想将semetic_kitti 的 64线点云转换成16线,并且要在ROS框架下验证其他算法，遂整理这个仓库用来存储数据集的制作工具
+
 ### build
 bash build.sh
 
@@ -10,7 +11,7 @@ bash cov_kitti_to_16.sh "/media/ubuntu/zhi_chuan_len-/kitti/dataset/sequences/01
 
 
 #                                                                                                                                      bin _pcd_cov.cpp:
-
+代码来自zzy
 pcd 和 bin 之间的相互转换
 
 Options
