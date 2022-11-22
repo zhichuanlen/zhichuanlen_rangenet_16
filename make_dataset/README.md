@@ -1,22 +1,23 @@
-## 因为我的研究内容之一（低密度点云的语义提取），需要数据集，想将semetic_kitti 的 64线点云转换成16线,并且要在ROS框架下验证其他算法，遂整理这个仓库用来存储数据集的制作工具
+## 因为我的研究内容之一（低密度点云的语义提取），需要数据集，想将semantic_kitti 的 64线点云转换成16线,并且要在ROS框架下验证其他算法，遂整理这个仓库用来存储数据集的制作工具
 
 semetic kitti 结构
-dataset
-    sequences
-        00
-              labels
-              velodyne
-              calib.txt
-              poses.txt
-              times.txt
-        01
-              labels
-              velodyne
-              calib.txt
-              poses.txt
-              times.txt
-…
-…
+
+-dataset  
+--sequences  
+---00  
+---- labels  
+---- velodyne  
+---- calib.txt  
+---- poses.txt  
+---- times.txt  
+---01  
+---- labels  
+---- velodyne  
+---- calib.txt  
+---- poses.txt  
+---- times.txt  
+…  
+…  
 
 ### build
 bash build.sh
