@@ -1,4 +1,4 @@
-# Install script for directory: /home/ubuntu/polar_ws/PolarSeg/make_dataset
+# Install script for directory: /home/ubuntu/zhichuanlen_rangenet_16/make_dataset
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -45,5 +45,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "/home/ubuntu/polar_ws/PolarSeg/make_dataset/build/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "/home/ubuntu/zhichuanlen_rangenet_16/make_dataset/build/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

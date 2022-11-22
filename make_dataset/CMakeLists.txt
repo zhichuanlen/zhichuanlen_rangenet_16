@@ -9,5 +9,8 @@ add_definitions(${PCL_DEFINITIONS})
 
 FIND_PACKAGE( Boost 1.65 COMPONENTS program_options REQUIRED )
 
-add_executable(${PROJECT_NAME} make_dataset.cpp)
-target_link_libraries (${PROJECT_NAME} ${PCL_LIBRARIES} ${Boost_LIBRARIES})
+add_executable(${PROJECT_NAME}_make_dataset make_dataset.cpp)
+target_link_libraries (${PROJECT_NAME}_make_dataset ${PCL_LIBRARIES} ${Boost_LIBRARIES})
+
+add_executable(${PROJECT_NAME}_bin_pcd_cov bin_pcd_cov.cpp)
+target_link_libraries (${PROJECT_NAME}_bin_pcd_cov ${PCL_LIBRARIES} ${Boost_LIBRARIES})
