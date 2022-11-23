@@ -126,16 +126,16 @@ void sort_filelists(std::vector<std::string>& filists,std::string type)
 
 
 
-void make_dataset(std::string &in_bin_file, std::string &in_label_file , std::string &out_bin_file ,std::string &out_label_file)
+void make_dataset(std::string &in_bin_file, std::string &in_label_file , std::string &out_bin_file ,std::string &out_label_file , bool label_e)
 {
     // load file
     std::ifstream input_bin(in_bin_file.c_str(), std::ios::in | std::ios::binary);
-    std::ifstream input_label(in_label_file.c_str(), std::ios::in | std::ios::binary);
     std::ofstream my_bin_File (out_bin_file.c_str(), std::ios::out | std::ios::binary);
+    std::ifstream input_label(in_label_file.c_str(), std::ios::in | std::ios::binary);
     std::ofstream my_label_File (out_label_file.c_str(), std::ios::out | std::ios::binary);
-
     input_bin.seekg(0, std::ios::beg);
-    input_label.seekg(0, std::ios::beg);
+    if(label_e) input_label.seekg(0, std::ios::beg);
+
 
     int i;
     int count = 0;
@@ -147,7 +147,7 @@ void make_dataset(std::string &in_bin_file, std::string &in_label_file , std::st
         input_bin.read((char *) &p_y, sizeof(uint32_t));
         input_bin.read((char *) &p_z, sizeof(uint32_t));
         input_bin.read((char *) &p_i, sizeof(uint32_t));
-        input_label.read((char*)&l ,  sizeof(uint32_t));
+        if(label_e) input_label.read((char*)&l ,  sizeof(uint32_t));
 
 
         float r = 0;
@@ -161,21 +161,21 @@ void make_dataset(std::string &in_bin_file, std::string &in_label_file , std::st
             my_bin_File.write((char*)&p_z, sizeof(float));
             my_bin_File.write((char*)&p_i, sizeof(float));
 
-            my_label_File.write((char*)&l, sizeof(float));
+            if(label_e) my_label_File.write((char*)&l, sizeof(float));
             count++;
         }
 
     }
     input_bin.close();
-    input_label.close();
-
     my_bin_File.close();
-    my_label_File.close();
-
     std::cout<<"read points= :"<< i <<std::endl;
-    std::cout<<"read labels= :"<< i <<std::endl;
 
-    
+    if(label_e)
+    {
+        input_label.close();
+        my_label_File.close();
+        std::cout<<"read labels= :"<< i <<std::endl;
+    } 
 }
 
 
@@ -251,23 +251,28 @@ int main(int argc, char **argv)
     read_filelists(cmd_args._input_path+"/labels/", label_lists, "label" );
     sort_filelists( label_lists, "label" );
     std::cout<<"num of label file:"<<label_lists.size()<<std::endl;
-
+    bool label_e = false;
+    if(label_lists.size() > 0) label_e = true; 
     std::cout << "Run make_dataset" << std::endl;
     #pragma omp parallel num_threads(8)
     #pragma omp parallel for
     for (int i = 0; i < file_lists.size(); ++i)
     {
         std::string bin_file = cmd_args._input_path+"/velodyne/" + file_lists[i];
-        std::string label_file = cmd_args._input_path+"/labels/" + label_lists[i];
-
         std::string bin_out_file = cmd_args._output_path+"/velodyne/" + file_lists[i];
-        std::string label_out_file = cmd_args._output_path+"/labels/" + label_lists[i];
+        std::string label_file = "";
+        std::string label_out_file = "";
+        if(label_e)
+        {
+            label_file = cmd_args._input_path+"/labels/" + label_lists[i];
+            label_out_file = cmd_args._output_path+"/labels/" + label_lists[i];
+        }
 
         std::cout << bin_file << "\n"
                     << bin_out_file << "\n"
                     << label_file << "\n"
                     << label_out_file << std::endl;
-        make_dataset( bin_file, label_file , bin_out_file , label_out_file);
+        make_dataset( bin_file, label_file , bin_out_file , label_out_file,label_e);
     }
     return 0;
 }
