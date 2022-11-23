@@ -1,10 +1,12 @@
 #coding=utf-8
+#!/usr/bin/env python2
 import rospy
 import struct
 import time,os,sys
 import numpy as np
 import os
 import threading
+import tf
 from threading import Lock, RLock
 from tqdm import tqdm
 from pyquaternion import Quaternion
@@ -12,6 +14,7 @@ from std_msgs.msg import Char,Header
 from sensor_msgs import point_cloud2
 from sensor_msgs.msg import PointCloud2, PointField
 from nav_msgs.msg import Odometry
+from geometry_msgs.msg import TransformStamped
 
 def label_to_color(one_label): #传入一个预测的类别代号，返回一个特定的rgb值
     dict_color = {
@@ -92,43 +95,53 @@ def pub_pointcloud(data_path,label_path,pub_time):
     pub.publish(pcl2) #发布topic
     
 def get_odom_data(odom_file_path):
-    dataset = []
-    groundtruth = []
+    q_list = []
+    groundtruth_list = []
     with open(odom_file_path) as f:
-        list_file = f.readlines()
-
-        # 将每一行数据转为数组
-        for i in range(len(list_file)):
-            list_line = list_file[i].split(' ')
+        for line in f.readlines():
+            line = line.split(' ')
             # 将元素由字符串转为float
-            list_line = list(map(float, list_line))
+            line = list(map(float, line))
             # 向量转矩阵
-            list_line = np.array(list_line)
-            list_line.resize(3, 4)
-            dataset.append(list_line)
-            groundtruth.append([list_line[0, 3], list_line[2, 3]])
-        # 最后得到两个numpu矩阵，dataset是存放所有真值的矩阵，groundtruth是存放xy真值的矩阵
-        dataset = np.array(dataset)
-        groundtruth = np.array(groundtruth)
-    return dataset , groundtruth
+            line = np.array(line)
+            line.resize(3, 4)
+            # data3_3 = line[:, :3]
+            # q = Quaternion(matrix=data3_3)
+            add = np.array([0,0,0,1])
+            q = tf.transformations.quaternion_from_matrix(np.r_[line,[add]])
+            q_list.append(q)
+            groundtruth_list.append([line[0, 3], line[2, 3]])
+        # 最后得到两个numpy矩阵，dataset是存放所有真值的矩阵，groundtruth是存放xy真值的矩阵
+        q_list = np.array(q_list)
+        groundtruth_list = np.array(groundtruth_list)
+    return q_list , groundtruth_list
 
 def get_time_data_list(time_file_path):
     with open(time_file_path) as f:
          return f.readlines()
     
 def pub_odom(xy, q):
-    time_now = rospy.Time.now().to_sec()
-
-    # 发布TF变换
-    time_last = time_now
-    time_now = rospy.Time.now().to_sec()
-
     send_Od_data=Odometry()
-    send_Od_data
+    send_tf_data = TransformStamped() 
+    # 发布tf
+    send_tf_data.header.stamp = rospy.Time.now()
+    send_tf_data.header.frame_id = "odom"
+    send_tf_data.child_frame_id = "base_link"
+
+    send_tf_data.transform.translation.x = xy[0]
+    send_tf_data.transform.translation.y = xy[1]
+    send_tf_data.transform.translation.z = 0
+
+    send_tf_data.transform.rotation.w = q[3]
+    send_tf_data.transform.rotation.x = q[0]
+    send_tf_data.transform.rotation.y = q[1]
+    send_tf_data.transform.rotation.z = q[2]
+    
+    tf_pub.sendTransformMessage(send_tf_data)
 
     # 发布里程计信息
-    send_Od_data.header.frame_id = "odom"
     send_Od_data.header.stamp = rospy.Time.now()
+    send_Od_data.header.frame_id = "odom"
     send_Od_data.child_frame_id = "base_link"
 
     send_Od_data.pose.pose.position.x = xy[0]
@@ -138,7 +151,7 @@ def pub_odom(xy, q):
     send_Od_data.pose.pose.orientation.x = q[0]
     send_Od_data.pose.pose.orientation.y = q[1]
     send_Od_data.pose.pose.orientation.z = q[2]
-    send_Od_data.pose.pose.orientation.z = q[3]
+    send_Od_data.pose.pose.orientation.w = q[3]
     
     odom_pub.publish(send_Od_data)
     
@@ -155,9 +168,9 @@ def show_odom_path():
     x_data = []
     y_data = []
 #     print(len(dataset))
-    for i in range(len(odom_R_t)):
-        x_data.append(float(odom_R_t[i][0, 3]))
-        y_data.append(float(odom_R_t[i][2, 3]))
+    for i in range(len(groundtruth)):
+        x_data.append(float(groundtruth[i][0]))
+        y_data.append(float(groundtruth[i][1]))
     # 绘制
     lock = Lock()
     with lock:
@@ -172,10 +185,7 @@ def main_pub():
         time_list = get_time_data_list(time_file_path)
         pub_time = time_begin + float(time_list[i])
         pub_pointcloud(bin_file_path+str(bin_files[i]),label_file_path+str(label_files[i]),pub_time)
-        try:
-            pub_odom(groundtruth[i], R_t_2_q(odom_R_t[i]))
-        except:
-            print("pub odom faild :" ,i)
+        pub_odom(groundtruth[i], q_list[i])
             
         t_out = time.time()
         used_time = t_out-t_in
@@ -186,8 +196,9 @@ def main_pub():
 if __name__ == "__main__":
 
     rospy.init_node('kitti_node', anonymous=True)#创建ros_node
-    pub=rospy.Publisher('kitti_point_cloud',PointCloud2,queue_size=10)#创建一个发布点云的publisher
-    odom_pub = rospy.Publisher("odom", Odometry, queue_size=100)  # 里程计话题发布者
+    pub=rospy.Publisher('rslidar',PointCloud2,queue_size=10)#点云的publisher
+    odom_pub = rospy.Publisher("odom", Odometry, queue_size=100)  # 里程计publisher
+    tf_pub = tf.TransformBroadcaster()  # TF变换publisher
 
     data_path  = sys.argv[1]
     bin_file_path   = data_path + 'velodyne/'
@@ -199,7 +210,7 @@ if __name__ == "__main__":
     bin_files = sorted(os.listdir(bin_file_path))
     label_files = sorted(os.listdir(label_file_path))
 
-    odom_R_t, groundtruth = get_odom_data(odom_file_path)
+    q_list, groundtruth = get_odom_data(odom_file_path)
     pub_t = threading.Thread(target = main_pub)
     pub_t.start()
     show_odom_path()
