@@ -97,6 +97,12 @@ def pub_pointcloud(data_path,label_path,pub_time):
 def get_odom_data(odom_file_path):
     q_list = []
     groundtruth_list = []
+    Tr_raw="4.276802385584e-04 -9.999672484946e-01 -8.084491683471e-03 -1.198459927713e-02 -7.210626507497e-03 8.081198471645e-03 -9.999413164504e-01 -5.403984729748e-02 9.999738645903e-01 4.859485810390e-04 -7.206933692422e-03 -2.921968648686e-01"
+    add = np.array([0,0,0,1])
+    Tr = np.array(list(map(float, Tr_raw.split(' '))))
+    Tr.resize(3, 4)
+    Tr = np.r_[Tr,[add]]
+    Tr_inv = np.matrix(Tr).I
     with open(odom_file_path) as f:
         for line in f.readlines():
             line = line.split(' ')
@@ -105,10 +111,9 @@ def get_odom_data(odom_file_path):
             # 向量转矩阵
             line = np.array(line)
             line.resize(3, 4)
-            # data3_3 = line[:, :3]
-            # q = Quaternion(matrix=data3_3)
-            add = np.array([0,0,0,1])
-            q = tf.transformations.quaternion_from_matrix(np.r_[line,[add]])
+            line_matrix = np.r_[line,[add]]
+            line_matrix = Tr_inv * line_matrix * Tr
+            q = tf.transformations.quaternion_from_matrix(line_matrix)
             q_list.append(q)
             groundtruth_list.append([line[0, 3], line[2, 3]])
         # 最后得到两个numpy矩阵，dataset是存放所有真值的矩阵，groundtruth是存放xy真值的矩阵
@@ -128,14 +133,14 @@ def pub_odom(xy, q):
     send_tf_data.header.frame_id = "odom"
     send_tf_data.child_frame_id = "base_link"
 
-    send_tf_data.transform.translation.x = xy[0]
-    send_tf_data.transform.translation.y = xy[1]
+    send_tf_data.transform.translation.x = xy[1]
+    send_tf_data.transform.translation.y = -xy[0]
     send_tf_data.transform.translation.z = 0
 
-    send_tf_data.transform.rotation.w = q[3]
     send_tf_data.transform.rotation.x = q[0]
     send_tf_data.transform.rotation.y = q[1]
     send_tf_data.transform.rotation.z = q[2]
+    send_tf_data.transform.rotation.w = q[3]
     
     tf_pub.sendTransformMessage(send_tf_data)
 
@@ -144,8 +149,8 @@ def pub_odom(xy, q):
     send_Od_data.header.frame_id = "odom"
     send_Od_data.child_frame_id = "base_link"
 
-    send_Od_data.pose.pose.position.x = xy[0]
-    send_Od_data.pose.pose.position.y = xy[1]
+    send_Od_data.pose.pose.position.x = xy[1]
+    send_Od_data.pose.pose.position.y = -xy[0]
     send_Od_data.pose.pose.position.z = 0
 
     send_Od_data.pose.pose.orientation.x = q[0]
@@ -172,10 +177,8 @@ def show_odom_path():
         x_data.append(float(groundtruth[i][0]))
         y_data.append(float(groundtruth[i][1]))
     # 绘制
-    lock = Lock()
-    with lock:
-        plt.plot(x_data,y_data)
-        plt.show()
+    plt.plot(x_data,y_data)
+    plt.show()
 
 def main_pub():
     time_begin = time.time()
