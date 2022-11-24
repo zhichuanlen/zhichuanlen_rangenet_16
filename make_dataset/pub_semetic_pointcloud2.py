@@ -186,7 +186,8 @@ def main_pub():
     for i in tqdm(range(len(bin_files))):
         t_in = time.time()
         time_list = get_time_data_list(time_file_path)
-        pub_time = time_begin + float(time_list[i])
+        #帧率减半
+        pub_time = time_begin + float(time_list[i])*2
         pub_pointcloud(bin_file_path+str(bin_files[i]),label_file_path+str(label_files[i]),pub_time)
         pub_odom(groundtruth[i], q_list[i])
             
