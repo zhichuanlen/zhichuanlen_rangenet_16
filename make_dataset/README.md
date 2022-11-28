@@ -46,3 +46,5 @@ Options
  python pub_semetic_pointcloud2.py '/media/ubuntu/zhi_chuan_len-/lidar_data/get_kitti_bin_16/sequences/01/'
  ![Image text]( https://github.com/zhichuanlen/zhichuanlen_rangenet_16/blob/main/make_dataset/images/rviz.jpg)
 
+使用gmapping来建图实验
+![Image text]( https://github.com/zhichuanlen/zhichuanlen_rangenet_16/blob/main/make_dataset/images/gmapping.jpg)
