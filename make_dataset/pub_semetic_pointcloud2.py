@@ -195,6 +195,7 @@ def main_pub():
         used_time = t_out-t_in
         time_cost_sum += used_time
     print("共发布"+str(len(bin_files))+"帧消息,平均帧率为"+str(1/(time_cost_sum/len(bin_files))))
+    sys.exit(0)
 
 
 if __name__ == "__main__":
@@ -206,7 +207,8 @@ if __name__ == "__main__":
 
     data_path  = sys.argv[1]
     bin_file_path   = data_path + 'velodyne/'
-    label_file_path = data_path + 'labels/'
+    # label_file_path = data_path + 'labels/'
+    label_file_path = data_path + 'pre/'
     odom_file_path  = data_path + 'poses.txt'
     time_file_path  = data_path + 'times.txt'
 
@@ -215,6 +217,8 @@ if __name__ == "__main__":
     label_files = sorted(os.listdir(label_file_path))
 
     q_list, groundtruth = get_odom_data(odom_file_path)
-    pub_t = threading.Thread(target = main_pub)
-    pub_t.start()
-    show_odom_path()
+    # pub_t = threading.Thread(target = main_pub)
+    show_t = threading.Thread(target = show_odom_path)
+    # pub_t.start()
+    show_t.start()
+    main_pub()
