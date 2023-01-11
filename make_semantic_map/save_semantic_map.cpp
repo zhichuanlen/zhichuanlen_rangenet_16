@@ -218,21 +218,21 @@ std::string trim(const std::string& str, const std::string& whitespaces = " \0\t
   return str.substr(beg, end - beg + 1);
 }
 
-/*               #################################################################################         */
+/*               #########################################以上是参数读取，无需关心########################################         */
 
-
+//体素滤波器
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr voxel_filter(pcl::PointCloud<pcl::PointXYZRGB>::Ptr points_in)
 {
     pcl::VoxelGrid<pcl::PointXYZRGB> sor;
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr points_filtered (new pcl::PointCloud<pcl::PointXYZRGB>);
     sor.setInputCloud(points_in);             //输入点云
-    sor.setLeafSize(0.5f, 0.5f, 0.5f); //体素滤波器，单位m
+    sor.setLeafSize(0.1f, 0.1f, 0.1f); //体素滤波器，单位m
     sor.filter(*points_filtered);          //滤波后的点云
     return points_filtered;
 }
 
 
-
+//将poses.txt读入，可以是gps数据，也可以是SLAM预测数据
 std::vector<Eigen::Matrix4f> loadPoses(const std::string& file_name) {
   std::vector<Eigen::Matrix4f> poses;
   std::ifstream fp(file_name.c_str());
@@ -266,7 +266,7 @@ std::vector<Eigen::Matrix4f> loadPoses(const std::string& file_name) {
   return poses;
 }
 
-
+//获取轨迹数据，没有姿态信息
 std::vector<Eigen::Matrix4f> get_groundtruth(const std::string& file_name)
 {
     std::vector<Eigen::Matrix4f> poses =  loadPoses(file_name);
@@ -282,7 +282,7 @@ std::vector<Eigen::Matrix4f> get_groundtruth(const std::string& file_name)
     return groundtruth;
 }
 
-
+//读取一帧彩色的点云
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr load_a_semantic_points(std::string &in_file, std::string &in_file_label)
 {
     pcl::PointCloud<pcl::PointXYZI>::Ptr points (new pcl::PointCloud<pcl::PointXYZI>);
@@ -339,7 +339,7 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr load_a_semantic_points(std::string &in_fi
 }
 
 
-
+//读取一帧保存一帧
 void save_semantic_pcd_from_KittiPclBinData(std::string &in_file, std::string &in_file_label,std::string& out_file)
 {
     // load point cloud
@@ -406,6 +406,7 @@ void save_semantic_pcd_from_KittiPclBinData(std::string &in_file, std::string &i
     writer_label.write< pcl::PointXYZRGB > (out_file, *points_label, true);
 }
 
+//给点云做坐标变换，形成地图的关键
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr transform_points(pcl::PointCloud<pcl::PointXYZRGB>::Ptr semantic_points,Eigen::Matrix4f tfMatrix)
 {
     // pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed_cloud;
@@ -413,6 +414,7 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr transform_points(pcl::PointCloud<pcl::Poi
     pcl::transformPointCloud(*semantic_points, *transformed_cloud, tfMatrix);
     return transformed_cloud;
 }
+
 
 void save_semantic_pcd(std::string &in_file,pcl::PointCloud<pcl::PointXYZRGB>::Ptr points)
 {
