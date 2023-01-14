@@ -1,8 +1,3 @@
-#include <omp.h>
-#include <ctime>
-#include <vector>
-#include <string>
-#include <dirent.h>
 #include <algorithm>
 #include <fstream>
 #include <ros/ros.h>
@@ -23,9 +18,6 @@
 #include <boost/program_options.hpp>
 
 
-
-//namespace fs = std::experimental::filesystem::v1;
-
 static std::vector<std::string> file_lists;
 static std::vector<std::string> label_lists;
 std::string file_directory;
@@ -42,7 +34,7 @@ public:
 	int g = 0;
     int b = 0;
 };
-
+//语义类别对应的rgb信息
  std::map<int,std::vector<int>> dict_color = {
                                 { 0, {0, 0, 0} },
                                 {  1 , {0, 0, 255} },
@@ -252,7 +244,7 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr voxel_filter(pcl::PointCloud<pcl::PointXY
     return points_filtered;
 }
 
-//体素滤波器
+//均匀采样滤波器
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr uniform_filter(pcl::PointCloud<pcl::PointXYZRGB>::Ptr points_in)
 {
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr points_filtered (new pcl::PointCloud<pcl::PointXYZRGB>);
@@ -497,7 +489,6 @@ void SetMapTopicMsg(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud, nav_msgs
     if(y < y_min) y_min = y;
     if(y > y_max) y_max = y;
     }
-    // std::cout<<"x_min="<<x_min<<"  x_max="<<x_max<<"   y_min="<<y_min<<"   y_max="<<y_max<<std::endl;
 
     msg.info.origin.position.x = x_min;
     msg.info.origin.position.y = y_min;
@@ -512,8 +503,6 @@ void SetMapTopicMsg(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud, nav_msgs
 
     msg.data.resize(msg.info.width * msg.info.height);
     msg.data.assign(msg.info.width * msg.info.height, 0);
-    // std::cout<<"msg.info.width= "<<msg.info.width<<"    msg.info.height= "<<msg.info.height<<std::endl;
-    // std::cout<<"msg.info.width * msg.info.height = "<<msg.data.size()<<std::endl;
 
     int maxxx = 0;
     for(int iter = 0; iter < cloud->points.size()-1; iter++)
@@ -527,9 +516,10 @@ void SetMapTopicMsg(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud, nav_msgs
 
     msg.data[i + j* msg.info.width  ] = 150;
     }
-    // std::cout<<maxxx<<std::endl;
 }
 
+
+//从pcl发布一个二维栅格地图消息
 void ros_pgm_publisher(pcl::PointCloud<pcl::PointXYZRGB>::Ptr points)
 {
     ros::NodeHandle nh;
@@ -565,11 +555,12 @@ std::vector<std::vector<point>> SetMapTopicMsg(const pcl::PointCloud<pcl::PointX
         double x = cloud->points[i].x;
         double y = cloud->points[i].y;
 
-        if(x < x_min) x_min = x;
-        if(x > x_max) x_max = x;
+        x_min = std::min(x,x_min);
+        x_max = std::max(x,x_max);
 
-        if(y < y_min) y_min = y;
-        if(y > y_max) y_max = y;
+        y_min = std::min(y,y_min);
+        y_max = std::max(y,y_max);
+        
     }
 
     int width = int((x_max - x_min) / map_resolution)+10;
