@@ -5,6 +5,12 @@
 #include <dirent.h>
 #include <algorithm>
 #include <fstream>
+#include <ros/ros.h>
+#include <nav_msgs/OccupancyGrid.h>
+#include <nav_msgs/GetMap.h>
+#include <sensor_msgs/PointCloud2.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl_conversions/pcl_conversions.h>
 #include <pcl/io/pcd_io.h>
 #include <pcl/io/boost.h>
 #include <pcl/point_types.h>
@@ -12,6 +18,7 @@
 #include <pcl/common/transforms.h>  // pcl::transformPointCloud
 #include <pcl/visualization/pcl_visualizer.h>  // pcl::visualization::PCLVisualizer
 #include <pcl/filters/voxel_grid.h>  //体素滤波器头文件
+#include <pcl/filters/uniform_sampling.h>  //均匀采样滤波器头文件
 #include <sys/stat.h>
 #include <boost/program_options.hpp>
 
@@ -21,6 +28,20 @@
 
 static std::vector<std::string> file_lists;
 static std::vector<std::string> label_lists;
+std::string file_directory;
+std::string file_name;
+std::string pcd_file;
+std::string map_topic_name = "map";
+const std::string pcd_format = ".pcd";
+nav_msgs::OccupancyGrid map_topic_msg;
+
+//存储ppm rgb信息的容器
+class point {
+public:
+	int r = 0;
+	int g = 0;
+    int b = 0;
+};
 
  std::map<int,std::vector<int>> dict_color = {
                                 { 0, {0, 0, 0} },
@@ -226,10 +247,27 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr voxel_filter(pcl::PointCloud<pcl::PointXY
     pcl::VoxelGrid<pcl::PointXYZRGB> sor;
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr points_filtered (new pcl::PointCloud<pcl::PointXYZRGB>);
     sor.setInputCloud(points_in);             //输入点云
-    sor.setLeafSize(0.1f, 0.1f, 0.1f); //体素滤波器，单位m
+    sor.setLeafSize(0.15f, 0.15f, 0.2f); //体素滤波器，单位m
     sor.filter(*points_filtered);          //滤波后的点云
     return points_filtered;
 }
+
+//体素滤波器
+pcl::PointCloud<pcl::PointXYZRGB>::Ptr uniform_filter(pcl::PointCloud<pcl::PointXYZRGB>::Ptr points_in)
+{
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr points_filtered (new pcl::PointCloud<pcl::PointXYZRGB>);
+    // 创建均匀采样（模板）类对象，点数据类型为 pcl::PointXYZRGB
+    pcl::UniformSampling<pcl::PointXYZRGB> us;
+    // 设置输入点云，注意：此处传入的是点云类对象的智能指针
+    us.setInputCloud(points_in);
+    // 设置采样半径，数值越大越稀疏
+    us.setRadiusSearch(0.1f);
+    // 执行过滤，并带出处理后的点云数据，注意：此处传入的是点云类对象
+    us.filter(*points_filtered);
+    return points_filtered;
+}
+
+    
 
 
 //将poses.txt读入，可以是gps数据，也可以是SLAM预测数据
@@ -423,11 +461,185 @@ void save_semantic_pcd(std::string &in_file,pcl::PointCloud<pcl::PointXYZRGB>::P
 }
 
 
+void SetMapTopicMsg(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud, nav_msgs::OccupancyGrid& msg, double min_z, double max_z)
+{
+    float map_resolution = 0.05;
+    msg.header.seq = 0;
+    msg.header.stamp = ros::Time::now();
+    msg.header.frame_id = "map";
+
+    msg.info.map_load_time = ros::Time::now();
+    msg.info.resolution = map_resolution;
+
+    double x_min, x_max, y_min, y_max;
+
+    if(cloud->points.empty())
+    {
+    ROS_WARN("cloud is empty!\n");
+
+    return;
+    }
+
+    for(int i = 0; i < cloud->points.size() - 1; i++)//求出地图的边界位置
+    {
+    if(i == 0)
+    {
+        x_min = x_max = cloud->points[i].x;
+        y_min = y_max = cloud->points[i].y;
+    }
+
+    double x = cloud->points[i].x;
+    double y = cloud->points[i].y;
+
+    if(x < x_min) x_min = x;
+    if(x > x_max) x_max = x;
+
+    if(y < y_min) y_min = y;
+    if(y > y_max) y_max = y;
+    }
+    // std::cout<<"x_min="<<x_min<<"  x_max="<<x_max<<"   y_min="<<y_min<<"   y_max="<<y_max<<std::endl;
+
+    msg.info.origin.position.x = x_min;
+    msg.info.origin.position.y = y_min;
+    msg.info.origin.position.z = 0.0;
+    msg.info.origin.orientation.x = 0.0;
+    msg.info.origin.orientation.y = 0.0;
+    msg.info.origin.orientation.z = 0.0;
+    msg.info.origin.orientation.w = 1.0;
+
+    msg.info.width = int((x_max - x_min) / map_resolution);
+    msg.info.height = int((y_max - y_min) / map_resolution)+10;
+
+    msg.data.resize(msg.info.width * msg.info.height);
+    msg.data.assign(msg.info.width * msg.info.height, 0);
+    // std::cout<<"msg.info.width= "<<msg.info.width<<"    msg.info.height= "<<msg.info.height<<std::endl;
+    // std::cout<<"msg.info.width * msg.info.height = "<<msg.data.size()<<std::endl;
+
+    int maxxx = 0;
+    for(int iter = 0; iter < cloud->points.size()-1; iter++)
+    {
+        int i = int((cloud->points[iter].x - x_min) / map_resolution);
+        int j = int((cloud->points[iter].y - y_min) / map_resolution);
+
+    if(cloud->points[iter].z < min_z||cloud->points[iter].z > max_z+(-cloud->points[iter].x)/30+(cloud->points[iter].y)/20) continue;
+    if(cloud->points[iter].r == 255 && cloud->points[iter].r == 0 && cloud->points[iter].r == 255) continue; //滤除地面
+
+
+    msg.data[i + j* msg.info.width  ] = 150;
+    }
+    // std::cout<<maxxx<<std::endl;
+}
+
+void ros_pgm_publisher(pcl::PointCloud<pcl::PointXYZRGB>::Ptr points)
+{
+    ros::NodeHandle nh;
+    ros::NodeHandle private_nh("~");
+    ros::Rate loop_rate(1.0);
+    double min_z = -3.5,max_z = 5.5;
+    ros::Publisher map_topic_pub = nh.advertise<nav_msgs::OccupancyGrid>(map_topic_name, 1);
+    SetMapTopicMsg(points, map_topic_msg , min_z , max_z);
+    while(ros::ok())
+    {
+        map_topic_pub.publish(map_topic_msg);
+        loop_rate.sleep();
+        ros::spinOnce();
+    }
+}
+
+
+std::vector<std::vector<point>> SetMapTopicMsg(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud,  double min_z, double max_z)
+{
+    float map_resolution = 0.05;
+    double x_min, x_max, y_min, y_max;
+    std::vector<std::vector<point>> data;
+
+    std::cout<<"cloud->points.size()  = "<<cloud->points.size()<<std::endl;
+    for(int i = 0; i < cloud->points.size() - 1; i++)//求出地图的边界位置
+    {
+        if(i == 0)
+        {
+            x_min = x_max = cloud->points[i].x;
+            y_min = y_max = cloud->points[i].y;
+        }
+
+        double x = cloud->points[i].x;
+        double y = cloud->points[i].y;
+
+        if(x < x_min) x_min = x;
+        if(x > x_max) x_max = x;
+
+        if(y < y_min) y_min = y;
+        if(y > y_max) y_max = y;
+    }
+
+    int width = int((x_max - x_min) / map_resolution)+10;
+    int height = int((y_max - y_min) / map_resolution)+10;
+    std::cout<<"width  = "<< width <<std::endl;
+    std::cout<<"height  = "<< height <<std::endl;
+    
+    data.resize(height);
+    for(int i = 0 ; i < height ; i ++)   data[i].resize(width);
+
+    for(int iter = 0; iter < cloud->points.size()-1; iter++)
+    {
+        int j = int((cloud->points[iter].x - x_min) / map_resolution);
+        int i = int((cloud->points[iter].y - y_min) / map_resolution);
+
+        data[i][j].r = cloud->points[iter].r;
+        data[i][j].g = cloud->points[iter].g;
+        data[i][j].b = cloud->points[iter].b;
+    }
+    return data;
+}
+
+void save_ppm(std::string &out_file,std::vector<std::vector<point>> data)
+{
+    int width = data[0].size();
+    int height = data.size();
+    FILE *fp;
+   	int i, j;
+	char chHeader[100] = {0};
+    unsigned char *canvas = (unsigned char *)malloc(sizeof(unsigned char) * width * height * 3);
+ 
+	//初始化画布
+    memset(canvas, 255, width * height * 3);
+	//打开文件
+	fp = fopen(out_file.c_str(), "w");
+	if(NULL == fp){
+		return;
+	}
+	//写入ppm文件头
+	sprintf(chHeader, "P6 %d %d 255 ", width, height);
+	fwrite(chHeader, sizeof(unsigned char), strlen(chHeader), fp);
+	//写入图像数据
+    for (i = 0; i < height; i++)
+    {
+        for (j = 0; j < width; j++)
+        {
+            	int index = i * width * 3 + j * 3;
+                int r = data[i][j].r;
+                int g = data[i][j].g;
+                int b = data[i][j].b;
+            	canvas[index] = r; // Red
+            	canvas[index + 1] = g; // Green
+            	canvas[index + 2] = b; // Blue
+        }
+    }
+	//保存图像数据到文件
+    fwrite(canvas, sizeof(unsigned char), width * height * 3, fp);
+ 
+	fclose(fp);
+	free(canvas);
+	return;
+}
+
+
 int main(int argc, char **argv)
 {
     
     CommandLineArgs cmd_args(argc, argv);
-
+    ros::init(argc, argv, "ros_pgm_publisher");
+    
     // Create _outputFile folder if not exist
     struct stat sb;
     std::string folderPath = cmd_args._pcd_path;
@@ -475,13 +687,16 @@ int main(int argc, char **argv)
         pcl::PointCloud<pcl::PointXYZRGB>::Ptr transformed_points = transform_points(semantic_points, groundtruth[i]);
 
         *final_points = *final_points + *transformed_points;
-        final_points = voxel_filter(final_points);
-
-        //保存点云为pcd格式
-        // save_semantic_pcd(pcd_file, transformed_points);
+        //做一次滤波，不然文件太大啦，那么密集也没啥用。
+        // if(i%10 == 0) final_points = voxel_filter(final_points);    //体素滤波
+        if(i%10 == 0) final_points = uniform_filter(final_points);
     }
+
     std::string final_pcd_file = cmd_args._pcd_path+"/final_points.pcd";
+    std::string final_ppm_file = cmd_args._pcd_path+"/final_points.ppm";
     save_semantic_pcd(final_pcd_file, final_points);
+    save_ppm(final_ppm_file,SetMapTopicMsg(final_points,  -5.0, 5.0));
+    // ros_pgm_publisher(final_points);
     return 0;
 }
 
