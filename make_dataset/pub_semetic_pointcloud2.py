@@ -77,7 +77,7 @@ def pub_pointcloud(data_path,label_path,pub_time):
     #包含xyz坐标值，包含反射率，但是反射率最后被replace成了rgb
     header=Header() #定义pcl2消息的头部
     header.stamp=rospy.Time.now() #打上ros时间戳
-    header.frame_id='rslidar' #方便调试，实际运行应改为Lidar的frame
+    header.frame_id='base_link' #方便调试，实际运行应改为Lidar的frame
 
     fields=[PointField('x', 0, PointField.FLOAT32, 1),
             PointField('y', 4, PointField.FLOAT32, 1),
@@ -189,7 +189,7 @@ def main_pub():
         fast = 0.5  #播放速率
         pub_time = time_begin + float(time_list[i])*(1/fast)
         pub_pointcloud(bin_file_path+str(bin_files[i]),label_file_path+str(label_files[i]),pub_time)
-        pub_odom(groundtruth[i], q_list[i])
+        # pub_odom(groundtruth[i], q_list[i])  #发布关于odom和baselink的tf关系
             
         t_out = time.time()
         used_time = t_out-t_in
@@ -201,14 +201,14 @@ def main_pub():
 if __name__ == "__main__":
 
     rospy.init_node('kitti_node', anonymous=True)#创建ros_node
-    pub=rospy.Publisher('rslidar',PointCloud2,queue_size=10)#点云的publisher
+    pub=rospy.Publisher('os1_points',PointCloud2,queue_size=10)#点云的publisher
     odom_pub = rospy.Publisher("odom", Odometry, queue_size=100)  # 里程计publisher
     tf_pub = tf.TransformBroadcaster()  # TF变换publisher
 
     data_path  = sys.argv[1]
     bin_file_path   = data_path + 'velodyne/'
     # label_file_path = data_path + 'labels/'
-    label_file_path = data_path + 'pre/'
+    label_file_path = data_path + 'labels/'
     odom_file_path  = data_path + 'poses.txt'
     time_file_path  = data_path + 'times.txt'
 
@@ -217,8 +217,7 @@ if __name__ == "__main__":
     label_files = sorted(os.listdir(label_file_path))
 
     q_list, groundtruth = get_odom_data(odom_file_path)
-    # pub_t = threading.Thread(target = main_pub)
-    show_t = threading.Thread(target = show_odom_path)
-    # pub_t.start()
-    show_t.start()
+
+    # show_t = threading.Thread(target = show_odom_path)  #画出轨迹
+    # show_t.start()
     main_pub()
