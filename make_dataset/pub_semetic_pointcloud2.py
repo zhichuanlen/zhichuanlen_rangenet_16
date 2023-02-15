@@ -68,9 +68,46 @@ def label_to_color(one_label): #传入一个预测的类别代号，返回一个
     rgba = struct.unpack('I', struct.pack('BBBB', b, g, r, a))[0]  #编码rgb打包成一个变量
     return rgba
 
+def semantic_filters(label):
+    unuseful_point=[252,253,254,255,256,257,258,259]
+    if int(label) in unuseful_point:
+        return False
+    return True
+def pub_pointcloud_with_filters(data_path,label_path,pub_time):
+    DATA_PATH = data_path
+    label = np.fromfile(label_path, dtype=np.int32)
+    label = label & 0xFFFF
+    print('point num ={label_size}'.format(label_size=label.size))
+    DATA_LABEL = label
+    point_cloud=np.fromfile(os.path.join(DATA_PATH),dtype=np.float32).reshape(-1,4)  #根据传来的地址吧bin文件转化成np.array   转换为nx4的矩阵
+    #包含xyz坐标值，包含反射率，但是反射率最后被replace成了rgb
+    header=Header() #定义pcl2消息的头部
+    header.stamp=rospy.Time.now() #打上ros时间戳
+    header.frame_id='rslidar' #方便调试，实际运行应改为Lidar的frame
+
+    fields=[PointField('x', 0, PointField.FLOAT32, 1),
+            PointField('y', 4, PointField.FLOAT32, 1),
+            PointField('z', 8, PointField.FLOAT32, 1),
+            PointField('rgba', 12, PointField.UINT32, 1),]
+    point_cloud=np.around(point_cloud,3)  #精确到小数点后三位
+    point_cloud=point_cloud.tolist()      #从np.array转到list
+    for h in range(min(len(DATA_LABEL),len(point_cloud))):
+        point_cloud[h][3] = label_to_color(DATA_LABEL[h])    #赋予颜色，每一个数据由XYZ 和经过打包后的RGB信息组成。
+        if not semantic_filters(DATA_LABEL[h]):
+            point_cloud[h][3] = 0
+            
+        #打包RGB代码为 rgba = struct.unpack('I', struct.pack('BBBB', b, g, r, a))[0]
+        #其中rgba的取值都是0到255
+    pcl2=point_cloud2.create_cloud(header,fields,point_cloud)  #组合编码成pcl2格式
+    while(time.time() < pub_time):
+        time.sleep(0.01)
+    pub.publish(pcl2) #发布topic
+
+
 def pub_pointcloud(data_path,label_path,pub_time):
     DATA_PATH = data_path
-    label = np.fromfile(label_path, dtype=np.uint32)
+    label = np.fromfile(label_path, dtype=np.int32)
+    label = label & 0xFFFF
     # print('point num ={label_size}'.format(label_size=label.size))
     DATA_LABEL = label
     point_cloud=np.fromfile(os.path.join(DATA_PATH),dtype=np.float32).reshape(-1,4)  #根据传来的地址吧bin文件转化成np.array   转换为nx4的矩阵
