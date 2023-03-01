@@ -88,11 +88,12 @@ def pub_pointcloud_with_filters(data_path,label_path,pub_time):
     fields=[PointField('x', 0, PointField.FLOAT32, 1),
             PointField('y', 4, PointField.FLOAT32, 1),
             PointField('z', 8, PointField.FLOAT32, 1),
-            PointField('rgba', 12, PointField.UINT32, 1),]
+            PointField('intensity', 12, PointField.FLOAT32, 1),
+            PointField('rgba', 16, PointField.UINT32, 1),]
     point_cloud=np.around(point_cloud,3)  #精确到小数点后三位
     point_cloud=point_cloud.tolist()      #从np.array转到list
     for h in range(min(len(DATA_LABEL),len(point_cloud))):
-        point_cloud[h][3] = label_to_color(DATA_LABEL[h])    #赋予颜色，每一个数据由XYZ 和经过打包后的RGB信息组成。
+        point_cloud[h].append(label_to_color(DATA_LABEL[h]))    #赋予颜色，每一个数据由XYZ 和经过打包后的RGB信息组成。
         if not semantic_filters(DATA_LABEL[h]):
             point_cloud[h][3] = 0
             
@@ -114,16 +115,17 @@ def pub_pointcloud(data_path,label_path,pub_time):
     #包含xyz坐标值，包含反射率，但是反射率最后被replace成了rgb
     header=Header() #定义pcl2消息的头部
     header.stamp=rospy.Time.now() #打上ros时间戳
-    header.frame_id='base_link' #方便调试，实际运行应改为Lidar的frame
+    header.frame_id='rslidar' #方便调试，实际运行应改为Lidar的frame
 
     fields=[PointField('x', 0, PointField.FLOAT32, 1),
             PointField('y', 4, PointField.FLOAT32, 1),
             PointField('z', 8, PointField.FLOAT32, 1),
-            PointField('rgba', 12, PointField.UINT32, 1),]
+            PointField('intensity', 12, PointField.FLOAT32, 1),
+            PointField('rgba', 16, PointField.UINT32, 1),]
     point_cloud=np.around(point_cloud,3)  #精确到小数点后三位
     point_cloud=point_cloud.tolist()      #从np.array转到list
     for h in range(min(len(DATA_LABEL),len(point_cloud))):
-        point_cloud[h][3] = label_to_color(DATA_LABEL[h])    #赋予颜色，每一个数据由XYZ 和经过打包后的RGB信息组成。
+        point_cloud[h].append(label_to_color(DATA_LABEL[h]))    #赋予颜色，每一个数据由XYZ 和经过打包后的RGB信息组成。
         #打包RGB代码为 rgba = struct.unpack('I', struct.pack('BBBB', b, g, r, a))[0]
         #其中rgba的取值都是0到255
     pcl2=point_cloud2.create_cloud(header,fields,point_cloud)  #组合编码成pcl2格式
@@ -238,7 +240,7 @@ def main_pub():
 if __name__ == "__main__":
 
     rospy.init_node('kitti_node', anonymous=True)#创建ros_node
-    pub=rospy.Publisher('os1_points',PointCloud2,queue_size=10)#点云的publisher
+    pub=rospy.Publisher('rslidar_points',PointCloud2,queue_size=10)#点云的publisher
     odom_pub = rospy.Publisher("odom", Odometry, queue_size=100)  # 里程计publisher
     tf_pub = tf.TransformBroadcaster()  # TF变换publisher
 

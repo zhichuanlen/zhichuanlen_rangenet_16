@@ -22,5 +22,5 @@ FIND_PACKAGE( Boost 1.65 COMPONENTS program_options REQUIRED )
 add_executable(save_semantic_map save_semantic_map.cpp)
 target_link_libraries (save_semantic_map ${PCL_LIBRARIES} ${Boost_LIBRARIES} ${catkin_LIBRARIES})
 
-add_executable(get_pgm_from_pcd get_pgm_from_pcd.cpp)
-target_link_libraries (get_pgm_from_pcd ${PCL_LIBRARIES} ${Boost_LIBRARIES} ${catkin_LIBRARIES})
+add_executable(get_ppm_from_pcd get_ppm_from_pcd.cpp)
+target_link_libraries (get_ppm_from_pcd ${PCL_LIBRARIES} ${Boost_LIBRARIES} ${catkin_LIBRARIES})
