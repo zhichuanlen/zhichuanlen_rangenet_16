@@ -347,9 +347,9 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr load_a_semantic_points(std::string &in_fi
 
         if (dict_color.count(label_) != 0)
         {
-            point_label.r = dict_color[label_][0];
+            point_label.r = dict_color[label_][2];
             point_label.g = dict_color[label_][1];
-            point_label.b = dict_color[label_][2];
+            point_label.b = dict_color[label_][0];
         }
         else 
         {
@@ -660,8 +660,8 @@ int main(int argc, char **argv)
     std::vector<Eigen::Matrix4f> groundtruth = get_groundtruth(pose_file);
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr final_points(new pcl::PointCloud<pcl::PointXYZRGB>);
 
-    // for (int i = 0; i < file_lists.size(); ++i)
-    for (int i = 0; i < 100; ++i)
+    for (int i = 0; i < file_lists.size(); ++i)
+    // for (int i = 0; i < 100; ++i)
     {
         if (i<file_lists.size()-1) printf("\r读取中[%.2lf%%]", i*100.0 / (file_lists.size() - 1));
 		else printf("\r读取完成[%.2lf%%]", i*100.0 / (file_lists.size() - 1));

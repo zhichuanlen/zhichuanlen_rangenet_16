@@ -115,7 +115,7 @@ def pub_pointcloud(data_path,label_path,pub_time):
     #包含xyz坐标值，包含反射率，但是反射率最后被replace成了rgb
     header=Header() #定义pcl2消息的头部
     header.stamp=rospy.Time.now() #打上ros时间戳
-    header.frame_id='rslidar' #方便调试，实际运行应改为Lidar的frame
+    header.frame_id='base_link' #方便调试，实际运行应改为Lidar的frame
 
     fields=[PointField('x', 0, PointField.FLOAT32, 1),
             PointField('y', 4, PointField.FLOAT32, 1),
@@ -225,7 +225,7 @@ def main_pub():
     for i in tqdm(range(len(bin_files))):
         t_in = time.time()
         time_list = get_time_data_list(time_file_path)
-        fast = 0.5  #播放速率
+        fast = 0.1  #播放速率
         pub_time = time_begin + float(time_list[i])*(1/fast)
         pub_pointcloud(bin_file_path+str(bin_files[i]),label_file_path+str(label_files[i]),pub_time)
         # pub_odom(groundtruth[i], q_list[i])  #发布关于odom和baselink的tf关系
@@ -240,7 +240,7 @@ def main_pub():
 if __name__ == "__main__":
 
     rospy.init_node('kitti_node', anonymous=True)#创建ros_node
-    pub=rospy.Publisher('rslidar_points',PointCloud2,queue_size=10)#点云的publisher
+    pub=rospy.Publisher('filtered_points',PointCloud2,queue_size=10)#点云的publisher
     odom_pub = rospy.Publisher("odom", Odometry, queue_size=100)  # 里程计publisher
     tf_pub = tf.TransformBroadcaster()  # TF变换publisher
 
